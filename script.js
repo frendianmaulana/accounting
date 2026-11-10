@@ -223,13 +223,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // Validasi Manual
     if (!description) {
       showToast("error", "Keterangan transaksi wajib diisi ya!");
-      descriptionInput.focus();
+      // descriptionInput.focus();
       return;
     }
 
     if (amountStr === "" || isNaN(parseFloat(amountStr)) || parseFloat(amountStr) <= 0) {
       showToast("error", "Nominal harus berupa angka lebih dari 0!");
-      amountInput.focus();
+      // amountInput.focus();
       return;
     }
 
@@ -293,7 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     renderTransactions();
     transactionForm.reset();
-    descriptionInput.focus();
+    // descriptionInput.focus();
     // Default radio balik ke pemasukan
     const incomeRadio = document.querySelector('input[name="type"][value="income"]');
     if (incomeRadio) incomeRadio.checked = true;
