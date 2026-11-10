@@ -604,6 +604,8 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       buttonsStyling: false,
       width: "500px",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
     });
   };
 
