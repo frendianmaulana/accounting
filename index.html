@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#064e3b" />
+
+    <title>Buku Keuangan - Frendian</title>
+
+    <link rel="icon" href="img/accounting.png" />
+
+    <!-- Bootstrap 5.3.3 CSS CDN -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+
+    <!-- Font Awesome 6.5.2 CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css" />
+
+    <!-- SweetAlert2 CSS CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="tampil.css" />
+
+    <!-- Terapkan tema sebelum render (mencegah flash / FOUC) -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem("theme_pref") || "auto";
+          var isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-bs-theme", pref === "auto" ? (isDark ? "dark" : "light") : pref);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="d-flex align-items-center justify-content-center py-md-4">
+    <!-- Main App Card Container -->
+    <div class="container-fluid p-0 d-flex justify-content-center">
+      <div class="app-card w-100">
+        <!-- Header Section -->
+        <header class="app-header shadow-sm">
+          <div class="header-blob-1"></div>
+          <div class="header-blob-2"></div>
+
+          <div class="d-flex justify-content-between align-items-center position-relative z-1">
+            <div>
+              <div class="d-inline-flex align-items-center gap-1 badge bg-white bg-opacity-20 text-white rounded-pill px-2 py-1 mb-1 small fw-normal">
+                <i class="fas fa-hand-holding-dollar text-warning"></i>
+                <span class="text-dark">بِسْمِ اللّٰهِ الرَّحْمنِ الرَّحِيْم</span>
+              </div>
+              <h1 class="h5 fw-bold mb-0 text-white tracking-tight">Buku Keuangan</h1>
+              <p class="text-white-50 small mb-0 fw-medium">Catatan Kas Harian</p>
+            </div>
+            <!-- Tombol Cetak PDF -->
+            <div class="d-flex gap-2">
+              <button
+                id="theme-button"
+                type="button"
+                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
+                title="Tema: Auto (ikuti sistem)"
+                aria-label="Ganti tema"
+                style="width: 38px; height: 38px"
+              >
+                <i id="theme-icon" class="bi bi-circle-half"></i>
+              </button>
+              <button
+                id="info-button"
+                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
+                title="Cara Pakai"
+                style="width: 38px; height: 38px"
+              >
+                <i class="bi bi-info-circle-fill"></i>
+              </button>
+              <!-- Tombol Preview Laporan -->
+              <button
+                id="preview-print"
+                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
+                title="Preview Laporan"
+                style="width: 38px; height: 38px"
+              >
+                <i class="bi bi-printer-fill"></i>
+              </button>
+
+              <!-- Tombol Reset Catatan -->
+              <button
+                id="reset-button"
+                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
+                title="Bersihkan Semua Catatan"
+                style="width: 38px; height: 38px"
+              >
+                <i class="fas fa-rotate-right"></i>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Glassmorphism Floating Summary Section -->
+        <section class="px-3">
+          <div class="card summary-card p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <span class="balance-title">Total Saldo Bersih</span>
+                <div id="balance" class="balance-amount text-success">Rp 0</div>
+              </div>
+              <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-1 small fw-semibold"> <i class="fas fa-wallet me-1"></i> Aktif </span>
+            </div>
+
+            <!-- Grid Pemasukan & Pengeluaran -->
+            <div class="row g-2 pt-1">
+              <div class="col-6">
+                <div class="sub-stat-box d-flex align-items-center gap-2">
+                  <div class="rounded-circle bg-success-subtle text-success p-2 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px">
+                    <i class="bi bi-arrow-down-left"></i>
+                  </div>
+                  <div class="overflow-hidden">
+                    <span class="text-muted d-block small" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase">Pemasukan</span>
+                    <span id="total-income" class="fw-bold text-success text-truncate d-block small">Rp 0</span>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="sub-stat-box d-flex align-items-center gap-2">
+                  <div class="rounded-circle bg-danger-subtle text-danger p-2 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px">
+                    <i class="bi bi-arrow-up-right"></i>
+                  </div>
+                  <div class="overflow-hidden">
+                    <span class="text-muted d-block small" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase">Pengeluaran</span>
+                    <span id="total-expense" class="fw-bold text-danger text-truncate d-block small">Rp 0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Filter & Search Section -->
+        <section class="px-3 pt-3 pb-1">
+          <div class="d-flex gap-2 align-items-center">
+            <!-- Search Bar -->
+            <div class="input-group input-group-sm flex-grow-1">
+              <span class="input-group-text bg-white border-end-0 rounded-start-pill text-muted">
+                <i class="fas fa-search small"></i>
+              </span>
+              <input type="text" id="search-input" class="form-control border-start-0 rounded-end-pill bg-white shadow-none ps-0" placeholder="Cari transaksi..." />
+            </div>
+
+            <!-- Filter Buttons (Semua, Masuk, Keluar) -->
+            <div class="btn-group btn-group-sm" role="group" aria-label="Filter Transaksi">
+              <button type="button" class="btn btn-outline-secondary rounded-start-pill filter-btn active" data-filter="all">Semua</button>
+              <button type="button" class="btn btn-outline-secondary filter-btn" data-filter="income">Masuk</button>
+              <button type="button" class="btn btn-outline-secondary rounded-end-pill filter-btn" data-filter="expense">Keluar</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Transaction List Section -->
+        <main id="transaction-list" class="transaction-container">
+          <!-- Transaksi akan dimuat dinamis lewat script.js -->
+          <div class="d-flex flex-column align-items-center justify-content-center h-100 py-5 text-muted opacity-50">
+            <i class="fas fa-wallet fa-3x mb-2 text-success"></i>
+            <p class="small fw-semibold mb-0">Memuat catatan kas...</p>
+          </div>
+        </main>
+
+        <!-- Form Input Transaksi (Footer) -->
+        <footer class="app-footer">
+          <form id="transaction-form" class="d-flex flex-column gap-2" novalidate>
+            <!-- Input Keterangan Transaksi -->
+            <div class="input-group">
+              <span class="input-group-text bg-white border-end-0 text-muted">
+                <i class="fas fa-pen-nib text-secondary small"></i>
+              </span>
+              <input
+                type="text"
+                id="description"
+                placeholder="Keterangan transaksi (misal: Beli pulsa, Jual buku)..."
+                class="form-control border-start-0 bg-white shadow-none ps-0 py-2"
+                autocomplete="off"
+              />
+            </div>
+
+            <!-- Baris Input Nominal & Pilihan Tipe -->
+            <div class="row g-2">
+              <!-- Nominal Uang -->
+              <div class="col-7">
+                <div class="input-group">
+                  <span class="input-group-text bg-white border-end-0 fw-bold text-success small">Rp</span>
+                  <input type="text" inputmode="numeric" id="amount" placeholder="0" class="form-control border-start-0 bg-white fw-bold shadow-none ps-0 py-2" autocomplete="off" />
+                </div>
+              </div>
+
+              <!-- Pilihan Tipe Transaksi (Segmented Toggle) -->
+              <div class="col-5">
+                <div class="btn-group w-100 h-100" role="group">
+                  <input type="radio" class="btn-check" name="type" id="type-income" value="income" checked autocomplete="off" />
+                  <label class="btn btn-outline-success d-flex align-items-center justify-content-center py-1 fw-bold small" for="type-income"> <i class="fas fa-plus me-1 small"></i> In </label>
+
+                  <input type="radio" class="btn-check" name="type" id="type-expense" value="expense" autocomplete="off" />
+                  <label class="btn btn-outline-danger d-flex align-items-center justify-content-center py-1 fw-bold small" for="type-expense"> <i class="fas fa-minus me-1 small"></i> Out </label>
+                </div>
+              </div>
+            </div>
+
+            <input type="hidden" id="edit-id" />
+
+            <!-- Tombol Aksi Form -->
+            <div class="d-flex gap-2 pt-1">
+              <button
+                type="button"
+                id="cancel-edit-button"
+                class="btn btn-light border text-secondary fw-semibold py-2 px-3 rounded-pill d-none align-items-center justify-content-center gap-1 shadow-sm"
+              >
+                <i class="fas fa-xmark"></i>
+                <span>Batal</span>
+              </button>
+
+              <button
+                type="submit"
+                id="add-button"
+                class="btn btn-gradient-emerald text-white fw-bold py-2 px-4 rounded-pill flex-grow-1 d-flex align-items-center justify-content-center gap-2 shadow-sm"
+              >
+                <i class="fas fa-circle-plus"></i>
+                <span>Catat Transaksi</span>
+              </button>
+            </div>
+          </form>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Bootstrap 5.3.3 JS Bundle -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- SweetAlert2 JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- App Logic Script -->
+    <script src="script.js"></script>
+    <script src="theme.js"></script>
+  </body>
+</html>
