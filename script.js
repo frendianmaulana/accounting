@@ -77,6 +77,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
+  window.showToast = showToast;
+
   // --- RENDER FUNCTIONS (Bootstrap 5.3 Based) ---
   const renderTransactionItem = (transaction) => {
     const { id, type, description, amount, timestamp } = transaction;

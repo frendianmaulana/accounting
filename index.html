@@ -32,9 +32,9 @@
     <script>
       (function () {
         try {
-          var pref = localStorage.getItem("theme_pref") || "auto";
+          var pref = localStorage.getItem("theme_pref");
           var isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          document.documentElement.setAttribute("data-bs-theme", pref === "auto" ? (isDark ? "dark" : "light") : pref);
+          document.documentElement.setAttribute("data-bs-theme", pref === "light" || pref === "dark" ? pref : isDark ? "dark" : "light");
         } catch (e) {}
       })();
     </script>
@@ -58,17 +58,15 @@
               <p class="text-white-50 small mb-0 fw-medium">Catatan Kas Harian</p>
             </div>
             <!-- Tombol Cetak PDF -->
-            <div class="d-flex gap-2">
-              <button
-                id="theme-button"
-                type="button"
-                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
-                title="Tema: Auto (ikuti sistem)"
-                aria-label="Ganti tema"
-                style="width: 38px; height: 38px"
-              >
-                <i id="theme-icon" class="bi bi-circle-half"></i>
-              </button>
+            <div class="d-flex gap-2 align-items-center">
+              <label class="theme-switch mb-0" title="Ganti tema" id="theme-switch">
+                <input type="checkbox" id="theme-switch-input" class="theme-switch-input" role="swtich" aria-label="Aktifkan tema gelap" />
+                <span class="theme-switch-track" aria-hidden="true">
+                  <i class="bi bi-sun-fill theme-switch-icon theme-switch-sun"></i>
+                  <i class="bi bi-moon-fill theme-switch-icon theme-switch-moon"></i>
+                  <span class="theme-switch-thumb"></span>
+                </span>
+              </label>
               <button
                 id="info-button"
                 class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
@@ -144,10 +142,10 @@
           <div class="d-flex gap-2 align-items-center">
             <!-- Search Bar -->
             <div class="input-group input-group-sm flex-grow-1">
-              <span class="input-group-text bg-white border-end-0 rounded-start-pill text-muted">
+              <span class="input-group-text border-end-0 rounded-start-pill text-muted">
                 <i class="fas fa-search small"></i>
               </span>
-              <input type="text" id="search-input" class="form-control border-start-0 rounded-end-pill bg-white shadow-none ps-0" placeholder="Cari transaksi..." />
+              <input type="text" id="search-input" class="form-control border-start-0 rounded-end-pill shadow-none ps-0" placeholder="Cari transaksi..." />
             </div>
 
             <!-- Filter Buttons (Semua, Masuk, Keluar) -->
@@ -173,14 +171,14 @@
           <form id="transaction-form" class="d-flex flex-column gap-2" novalidate>
             <!-- Input Keterangan Transaksi -->
             <div class="input-group">
-              <span class="input-group-text bg-white border-end-0 text-muted">
+              <span class="input-group-text border-end-0 text-muted">
                 <i class="fas fa-pen-nib text-secondary small"></i>
               </span>
               <input
                 type="text"
                 id="description"
                 placeholder="Keterangan transaksi (misal: Beli pulsa, Jual buku)..."
-                class="form-control border-start-0 bg-white shadow-none ps-0 py-2"
+                class="form-control border-start-0 shadow-none ps-0 py-2"
                 autocomplete="off"
               />
             </div>

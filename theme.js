@@ -1,61 +1,79 @@
-const themeButton = document.getElementById("theme-button");
-const themeIcon = document.getElementById("theme-icon");
+const themeSwitchInput = document.getElementById("theme-switch-input");
+const themeSwitchLabel = document.getElementById("theme-switch");
 
 const THEME_KEY = "theme_pref";
-const THEME_ORDER = ["light", "dark", "auto"];
 const darkMedia = window.matchMedia("(prefers-color-scheme: dark)");
 
-const THEME_META = {
-  light: { icon: "bi-sun-fill", title: "Tema: Terang — klik untuk Gelap" },
-  dark: { icon: "bi-moon-stars-fill", title: "Tema: Gelap — klik untuk Auto" },
-  auto: { icon: "bi-circle-half", title: "Tema: Auto (ikuti sistem) — klik untuk Terang" },
-};
-
-const getThemePref = () => {
+const getStoredTheme = () => {
   const saved = localStorage.getItem(THEME_KEY);
-  return THEME_ORDER.includes(saved) ? saved : "auto";
+  return saved === "light" || saved === "dark" ? saved : null;
 };
 
-const applyTheme = (pref, silent = false) => {
-  localStorage.setItem(THEME_KEY, pref);
+const getResolvedTheme = () => {
+  const stored = getStoredTheme();
+  if (stored) return stored;
+  return darkMedia.matches ? "dark" : "light";
+};
 
-  const resolved = pref === "auto" ? (darkMedia.matches ? "dark" : "light") : pref;
+// Panggil toast hanya jika tersedia (script.js memuatnya via DOMContentLoaded)
+const notify = (icon, title) => {
+  if (typeof window.showToast === "function") {
+    window.showToast(icon, title);
+  }
+};
 
-  document.documentElement.setAttribute("data-bs-theme", resolved);
-  document.documentElement.setAttribute("data-theme-pref", pref);
+const updateMetaColor = (theme) => {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#0f1817" : "#064e3b");
+};
 
-  // Update ikon & tooltip tombol
-  if (themeIcon && themeButton) {
-    themeIcon.className = `bi ${THEME_META[pref].icon}`;
-    themeButton.title = THEME_META[pref].title;
-    themeButton.setAttribute("aria-label", THEME_META[pref].title);
+const updateSwitchUI = (theme) => {
+  const isDark = theme === "dark";
+
+  if (themeSwitchInput) {
+    themeSwitchInput.checked = isDark;
+    themeSwitchInput.setAttribute("aria-label", isDark ? "Nonaktifkan tema gelap" : "Aktifkan tema gelap");
   }
 
-  // Update warna address bar browser mobile
-  const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if (metaTheme) metaTheme.setAttribute("content", resolved === "dark" ? "#0f1817" : "#064e3b");
+  if (themeSwitchLabel) {
+    themeSwitchLabel.title = isDark ? "Tema: Gelap — klik untuk Terang" : "Tema: Terang — klik untuk Gelap";
+  }
+};
+
+const applyTheme = (theme, silent = false) => {
+  localStorage.setItem(THEME_KEY, theme);
+  document.documentElement.setAttribute("data-bs-theme", theme);
+  updateSwitchUI(theme);
+  updateMetaColor(theme);
 
   if (!silent) {
-    const label = pref === "auto" ? "Otomatis (ikuti sistem)" : pref === "dark" ? "Gelap" : "Terang";
-    showToast("info", `Tema: ${label}`);
+    notify("info", `Tema: ${theme === "dark" ? "Gelap" : "Terang"}`);
   }
 };
 
-const toggleTheme = () => {
-  const next = THEME_ORDER[(THEME_ORDER.indexOf(getThemePref()) + 1) % THEME_ORDER.length];
-  applyTheme(next);
-};
+if (themeSwitchInput) {
+  themeSwitchInput.addEventListener("change", () => {
+    applyTheme(themeSwitchInput.checked ? "dark" : "light");
+  });
+}
 
-if (themeButton) themeButton.addEventListener("click", toggleTheme);
-
-// Ikuti perubahan tema sistem saat mode "auto"
+// Ikuti perubahan tema sistem selama user belum memilih manual
 const onSystemThemeChange = () => {
-  if (getThemePref() === "auto") applyTheme("auto", true);
+  if (getStoredTheme()) return; // user sudah pilih manual → abaikan
+  const resolved = darkMedia.matches ? "dark" : "light";
+  document.documentElement.setAttribute("data-bs-theme", resolved);
+  updateSwitchUI(resolved);
+  updateMetaColor(resolved);
 };
+
 if (typeof darkMedia.addEventListener === "function") {
   darkMedia.addEventListener("change", onSystemThemeChange);
 } else if (typeof darkMedia.addListener === "function") {
-  darkMedia.addListener(onSystemThemeChange); // fallback Safari lama
+  darkMedia.addListener(onSystemThemeChange);
 }
 
-applyTheme(getThemePref(), true);
+// Init (tanpa menulis ke localStorage → preferensi "belum dipilih" tetap terjaga)
+const initialTheme = getResolvedTheme();
+document.documentElement.setAttribute("data-bs-theme", initialTheme);
+updateSwitchUI(initialTheme);
+updateMetaColor(initialTheme);

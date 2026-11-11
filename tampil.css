@@ -375,3 +375,87 @@ html[data-bs-theme="dark"] .swal2-close {
 html[data-bs-theme="dark"] .swal2-timer-progress-bar {
   background: rgba(255, 255, 255, 0.25);
 }
+.theme-switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.theme-switch-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.theme-switch-track {
+  position: relative;
+  display: inline-block;
+  width: 86px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.theme-switch:hover .theme-switch-track {
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+.theme-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.theme-switch-input:checked ~ .theme-switch-track .theme-switch-thumb {
+  transform: translateX(44px);
+}
+
+.theme-switch-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  font-size: 0.72rem;
+  line-height: 1;
+  transition: color 0.25s ease;
+}
+
+.theme-switch-sun {
+  left: 13px;
+  color: #f59e0b; /* amber */
+}
+
+.theme-switch-moon {
+  right: 13px;
+  color: #94a3b8; /* slate */
+}
+
+/* Saat Gelap aktif: matahari jadi redup, bulan menyala */
+.theme-switch-input:checked ~ .theme-switch-track .theme-switch-sun {
+  color: rgba(255, 255, 255, 0.55);
+}
+.theme-switch-input:checked ~ .theme-switch-track .theme-switch-moon {
+  color: #8b5cf6; /* violet */
+}
+
+/* Fokus keyboard */
+.theme-switch-input:focus-visible ~ .theme-switch-track {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
+}
