@@ -45,10 +45,6 @@ const applyTheme = (theme, silent = false) => {
   document.documentElement.setAttribute("data-bs-theme", theme);
   updateSwitchUI(theme);
   updateMetaColor(theme);
-
-  if (!silent) {
-    notify("info", `Tema: ${theme === "dark" ? "Gelap" : "Terang"}`);
-  }
 };
 
 if (themeSwitchInput) {
