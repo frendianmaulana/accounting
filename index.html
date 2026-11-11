@@ -45,11 +45,14 @@
       <div class="app-card w-100">
         <!-- Header Section -->
         <header class="app-header shadow-sm">
-          <div class="header-blob-1"></div>
-          <div class="header-blob-2"></div>
+          <!-- Dekorasi blob dipisah agar header bisa overflow: visible -->
+          <div class="header-decor" aria-hidden="true">
+            <div class="header-blob-1"></div>
+            <div class="header-blob-2"></div>
+          </div>
 
-          <div class="d-flex justify-content-between align-items-center position-relative z-1">
-            <div>
+          <div class="header-content d-flex justify-content-between align-items-center gap-2">
+            <div class="header-title">
               <div class="d-inline-flex align-items-center gap-1 badge bg-white bg-opacity-20 text-white rounded-pill px-2 py-1 mb-1 small fw-normal">
                 <i class="fas fa-hand-holding-dollar text-warning"></i>
                 <span class="text-dark">بِسْمِ اللّٰهِ الرَّحْمنِ الرَّحِيْم</span>
@@ -57,42 +60,41 @@
               <h1 class="h5 fw-bold mb-0 text-white tracking-tight">Buku Keuangan</h1>
               <p class="text-white-50 small mb-0 fw-medium">Catatan Kas Harian</p>
             </div>
-            <!-- Tombol Cetak PDF -->
-            <div class="d-flex gap-2 align-items-center">
-              <label class="theme-switch mb-0" title="Ganti tema" id="theme-switch">
-                <input type="checkbox" id="theme-switch-input" class="theme-switch-input" role="swtich" aria-label="Aktifkan tema gelap" />
-                <span class="theme-switch-track" aria-hidden="true">
-                  <i class="bi bi-sun-fill theme-switch-icon theme-switch-sun"></i>
-                  <i class="bi bi-moon-fill theme-switch-icon theme-switch-moon"></i>
-                  <span class="theme-switch-thumb"></span>
-                </span>
-              </label>
-              <button
-                id="info-button"
-                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
-                title="Cara Pakai"
-                style="width: 38px; height: 38px"
-              >
-                <i class="bi bi-info-circle-fill"></i>
-              </button>
-              <!-- Tombol Preview Laporan -->
-              <button
-                id="preview-print"
-                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
-                title="Preview Laporan"
-                style="width: 38px; height: 38px"
-              >
-                <i class="bi bi-printer-fill"></i>
-              </button>
 
-              <!-- Tombol Reset Catatan -->
-              <button
-                id="reset-button"
-                class="btn btn-sm btn-outline-light border-opacity-50 rounded-circle p-2 d-flex align-items-center justify-content-center"
-                title="Bersihkan Semua Catatan"
-                style="width: 38px; height: 38px"
-              >
-                <i class="fas fa-rotate-right"></i>
+            <div class="header-actions-wrapper">
+              <!-- Kumpulan aksi: inline di desktop, jadi panel menu di HP -->
+              <div class="header-actions" id="header-actions">
+                <div class="header-action-item">
+                  <span class="header-action-label">Tema</span>
+                  <label class="theme-switch mb-0" id="theme-switch" title="Ganti tema">
+                    <input type="checkbox" id="theme-switch-input" class="theme-switch-input" role="switch" aria-label="Aktifkan tema gelap" />
+                    <span class="theme-switch-track" aria-hidden="true">
+                      <i class="bi bi-sun-fill theme-switch-icon theme-switch-sun"></i>
+                      <i class="bi bi-moon-fill theme-switch-icon theme-switch-moon"></i>
+                      <span class="theme-switch-thumb"></span>
+                    </span>
+                  </label>
+                </div>
+
+                <button id="info-button" class="header-action-btn" title="Cara Pakai" aria-label="Cara Pakai">
+                  <i class="bi bi-info-circle-fill"></i>
+                  <span class="header-action-label">Cara Pakai</span>
+                </button>
+
+                <button id="preview-print" class="header-action-btn" title="Preview Laporan" aria-label="Preview Laporan">
+                  <i class="bi bi-printer-fill"></i>
+                  <span class="header-action-label">Preview Laporan</span>
+                </button>
+
+                <button id="reset-button" class="header-action-btn" title="Bersihkan Semua Catatan" aria-label="Bersihkan Semua Catatan">
+                  <i class="fas fa-rotate-right"></i>
+                  <span class="header-action-label">Hapus Semua</span>
+                </button>
+              </div>
+
+              <!-- Tombol hamburger (hanya muncul di HP) -->
+              <button id="header-menu-toggle" class="header-menu-toggle" aria-label="Buka menu" aria-expanded="false" aria-controls="header-actions">
+                <i class="bi bi-list"></i>
               </button>
             </div>
           </div>
@@ -174,13 +176,7 @@
               <span class="input-group-text border-end-0 text-muted">
                 <i class="fas fa-pen-nib text-secondary small"></i>
               </span>
-              <input
-                type="text"
-                id="description"
-                placeholder="Keterangan transaksi (misal: Beli pulsa, Jual buku)..."
-                class="form-control border-start-0 shadow-none ps-0 py-2"
-                autocomplete="off"
-              />
+              <input type="text" id="description" placeholder="Keterangan transaksi (misal: Beli pulsa, Jual buku)..." class="form-control border-start-0 shadow-none ps-0 py-2" autocomplete="off" />
             </div>
 
             <!-- Baris Input Nominal & Pilihan Tipe -->
@@ -245,6 +241,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <!-- App Logic Script -->
+    <script src="menu.js"></script>
     <script src="script.js"></script>
     <script src="theme.js"></script>
   </body>

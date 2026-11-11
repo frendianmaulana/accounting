@@ -60,14 +60,10 @@ document.addEventListener("DOMContentLoaded", () => {
       toast: true,
       position: "top-end",
       showConfirmButton: false,
-      timer: 3000,
+      timer: 2000,
       timerProgressBar: true,
       customClass: {
         popup: "rounded-4 shadow-lg border-0",
-      },
-      didOpen: (toast) => {
-        toast.addEventListener("mouseenter", Swal.stopTimer);
-        toast.addEventListener("mouseleave", Swal.resumeTimer);
       },
     });
 

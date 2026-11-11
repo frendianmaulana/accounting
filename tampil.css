@@ -71,32 +71,209 @@ body {
   background: var(--header-gradient);
   padding: 2.25rem 1.5rem 2.5rem;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   color: #ffffff;
 }
 
-.header-blob-1 {
+/* Pembungkus blob: tetap memotong dekorasi lingkaran */
+.header-decor {
   position: absolute;
-  top: -40px;
-  right: -40px;
-  width: 140px;
-  height: 140px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 50%;
-  filter: blur(25px);
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
 }
 
-.header-blob-2 {
-  position: absolute;
-  bottom: -30px;
-  left: -30px;
-  width: 120px;
-  height: 120px;
-  background: rgba(16, 185, 129, 0.25);
+/* Konten header di atas summary-card, tapi background header tetap di bawah */
+.header-content {
+  position: relative;
+  z-index: 25;
+}
+
+.header-title {
+  min-width: 0;
+}
+
+.header-actions-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-action-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Label hanya tampil di dalam menu HP */
+.header-action-label {
+  display: none;
+}
+
+/* Tombol bulat ikon (desktop) */
+.header-action-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
   border-radius: 50%;
-  filter: blur(20px);
-  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.header-action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.75);
+  color: #ffffff;
+}
+
+.header-action-btn:active {
+  transform: scale(0.94);
+}
+
+/* Tombol hamburger */
+.header-menu-toggle {
+  display: none;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: #ffffff;
+  font-size: 1.15rem;
+  line-height: 1;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.header-menu-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+/* ---------- MOBILE (HP): hamburger + panel menu ---------- */
+@media (max-width: 575.98px) {
+  .header-menu-toggle {
+    display: inline-flex;
+  }
+
+  .header-actions {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 236px;
+    padding: 0.6rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+    background-color: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 18px 40px -12px rgba(6, 78, 59, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px) scale(0.96);
+    transform-origin: top right;
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease,
+      visibility 0.2s ease;
+    z-index: 40;
+  }
+
+  .header-actions.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+  }
+
+  .header-action-item {
+    justify-content: space-between;
+    padding: 0.3rem 0.65rem;
+    border-radius: 12px;
+    background-color: #f8fafc;
+  }
+
+  .header-action-btn {
+    width: 100%;
+    height: auto;
+    justify-content: flex-start;
+    padding: 0.6rem 0.65rem;
+    border: none;
+    border-radius: 12px;
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .header-action-btn:hover {
+    background-color: #eef2f6;
+    border-color: transparent;
+    color: #0f172a;
+  }
+
+  .header-action-btn i {
+    width: 18px;
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .header-action-label {
+    display: inline;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .header-action-item .header-action-label {
+    color: #0f172a;
+  }
+
+  /* Panel menu versi dark mode */
+  html[data-bs-theme="dark"] .header-actions {
+    background-color: #16211f;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.75);
+  }
+
+  html[data-bs-theme="dark"] .header-action-btn,
+  html[data-bs-theme="dark"] .header-action-item {
+    background-color: #1b2a27;
+    color: #e6edf3;
+  }
+
+  html[data-bs-theme="dark"] .header-action-btn:hover {
+    background-color: #22332f;
+    color: #ffffff;
+  }
+
+  html[data-bs-theme="dark"] .header-action-label,
+  html[data-bs-theme="dark"] .header-action-item .header-action-label {
+    color: #e6edf3;
+  }
 }
 
 /* Glassmorphism Floating Balance Summary */
