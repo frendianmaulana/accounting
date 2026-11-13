@@ -1,124 +1,366 @@
-document.addEventListener("DOMContentLoaded", () => {
-  // --- DOM Elements ---
-  const transactionForm = document.getElementById("transaction-form");
-  const descriptionInput = document.getElementById("description");
-  const amountInput = document.getElementById("amount");
-  const transactionList = document.getElementById("transaction-list");
-  const totalIncomeEl = document.getElementById("total-income");
-  const totalExpenseEl = document.getElementById("total-expense");
-  const balanceEl = document.getElementById("balance");
-  const resetButton = document.getElementById("reset-button");
-  const editIdInput = document.getElementById("edit-id");
-  const addButton = document.getElementById("add-button");
-  const cancelEditButton = document.getElementById("cancel-edit-button");
-  const searchInput = document.getElementById("search-input");
-  const filterButtons = document.querySelectorAll(".filter-btn");
-  const previewPrintButton = document.getElementById("preview-print");
-  const infoButton = document.getElementById("info-button");
+// import rumus from "./script2";
+const transactionForm = document.getElementById("transaction-form");
+const descriptionInput = document.getElementById("description");
+const amountInput = document.getElementById("amount");
+const transactionList = document.getElementById("transaction-list");
+const totalIncomeEl = document.getElementById("total-income");
+const totalExpenseEl = document.getElementById("total-expense");
+const balanceEl = document.getElementById("balance");
+const resetButton = document.getElementById("reset-button");
+const editIdInput = document.getElementById("edit-id");
+const addButton = document.getElementById("add-button");
+const cancelEditButton = document.getElementById("cancel-edit-button");
+const searchInput = document.getElementById("search-input");
+const filterButtons = document.querySelectorAll(".filter-btn");
+const previewPrintButton = document.getElementById("preview-print");
+const infoButton = document.getElementById("info-button");
+const roundButton = document.getElementById("round-button");
 
-  // --- State Application ---
-  let transactions = JSON.parse(localStorage.getItem("transactions_wa")) || [];
-  let editingId = null;
-  let currentFilter = "all"; // 'all' | 'income' | 'expense'
-  let currentSearchQuery = "";
+// --- RESPONSIVE ---
+const mobileMedia = window.matchMedia("(max-width: 575.98px)");
+const isSmallScreen = () => mobileMedia.matches;
 
-  // --- FORMATTERS ---
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+// ========================================================
+//  HELPERS: konversi nilai → string digit (BigInt-friendly)
+// ========================================================
 
-  const formatDateTime = (isoString) => {
-    if (!isoString) return "";
-    try {
-      const date = new Date(isoString);
-      if (isNaN(date.getTime())) {
-        return new Date().toLocaleString("id-ID", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        });
-      }
-      return date.toLocaleString("id-ID", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
-    } catch (e) {
-      console.error("Error formatting date:", isoString, e);
-      return new Date().toLocaleString("id-ID", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+/** Ambil digit murni dari Number, BigInt, atau string (tanpa pemisah). */
+const toDigits = (value) => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "bigint") return value < 0n ? (-value).toString() : value.toString();
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value === 0) return "0";
+    // Intl expand notasi eksponensial (mis. 1e22 → "10000000000000000000000")
+    return new Intl.NumberFormat("en-US", { useGrouping: false, maximumFractionDigits: 0 }).format(Math.round(value));
+  }
+  return String(value).replace(/\D/g, "");
+};
+
+/** Beri titik ribuan pada digit string. */
+const groupDigits = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+/** Ubah string digit → BigInt (0n untuk string kosong). */
+const digitsToBigInt = (digits) => (digits ? BigInt(digits) : 0n);
+
+// ========================================================
+//  FORMATTERS
+// ========================================================
+
+/** Rp dengan pemisah ribuan, aman untuk BigInt / angka raksasa. */
+const formatCurrency = (value) => {
+  let big;
+  if (typeof value === "bigint") big = value;
+  else if (typeof value === "number") {
+    if (!Number.isFinite(value)) return "Rp 0";
+    big = BigInt(Math.round(value));
+  } else {
+    const digits = toDigits(value);
+    if (!digits) return "Rp 0";
+    big = BigInt(digits);
+  }
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(big);
+};
+
+/**
+ * Format angka → versi pendek ala Indonesia (string-based, bebas presisi).
+ *   1_500_000         → "1,5 Juta"
+ *   1_000_000_000_000 → "1 T"
+ *   1e33              → "1 Des"
+ */
+const formatShortNumber = (value) => {
+  const digits = toDigits(value);
+  if (!digits || digits === "0") return "0";
+
+  const len = digits.length;
+
+  // Satuan skala pendek (short scale) — urut turun
+  const units = [
+    { exp: 33, label: "Des" }, // Desiliun
+    { exp: 30, label: "Non" }, // Noniliun
+    { exp: 27, label: "Okt" }, // Oktiliun
+    { exp: 24, label: "Sep" }, // Septiliun
+    { exp: 21, label: "Sek" }, // Sekstiliun
+    { exp: 18, label: "Qu" }, // Kuintiliun
+    { exp: 15, label: "Qa" }, // Kuadriliun
+    { exp: 12, label: "T" }, // Triliun
+    { exp: 9, label: "M" }, // Miliar
+    { exp: 6, label: "Juta" },
+    { exp: 3, label: "Ribu" },
+  ];
+
+  for (const { exp, label } of units) {
+    if (len > exp) {
+      const intPart = digits.slice(0, len - exp);
+      const decDigit = digits[len - exp] || "0";
+      const dec = decDigit !== "0" ? "," + decDigit : "";
+      return `${intPart}${dec} ${label}`;
     }
+  }
+  return groupDigits(digits);
+};
+
+/** Versi ringkas ber-"Rp" untuk kartu ringkasan (di bawah 1 juta tetap penuh). */
+const formatCompactCurrency = (value) => {
+  const big = typeof value === "bigint" ? value : digitsToBigInt(toDigits(value));
+  const neg = big < 0n;
+  const absBig = neg ? -big : big;
+  const sign = neg ? "-" : "";
+
+  if (absBig < 1_000_000n) return formatCurrency(value);
+  return `${sign}Rp ${formatShortNumber(absBig.toString())}`;
+};
+
+/** Tanggal/waktu. compact=true → versi pendek untuk HP. */
+const formatDateTime = (isoString, compact = false) => {
+  if (!isoString) return "";
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) {
+      return new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+    }
+    return date.toLocaleString("id-ID", compact ? { dateStyle: "short", timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" });
+  } catch (e) {
+    console.error("Error formatting date:", isoString, e);
+    return new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  }
+};
+
+/** Escape HTML untuk deskripsi. */
+const escapeHTML = (str) => String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+// --- SweetAlert2 Toast ---
+const showToast = (icon, title) => {
+  const Toast = Swal.mixin({
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 1200,
+    timerProgressBar: true,
+    customClass: { popup: "rounded-4 shadow-lg border-0" },
+  });
+  Toast.fire({ icon, title });
+};
+window.showToast = showToast;
+
+// ========================================================
+//  STATE
+// ========================================================
+// Migrasi otomatis: kalau ada tx.amount lama berbentuk Number, ubah ke string digit.
+let transactions = (JSON.parse(localStorage.getItem("transactions_wa")) || []).map((tx) => ({
+  ...tx,
+  amount: toDigits(tx.amount),
+}));
+
+let editingId = null;
+let currentFilter = "all";
+let currentSearchQuery = "";
+
+// ========================================================
+//  AMOUNT INPUT: ribuan + auto-compact (bebas presisi)
+// ========================================================
+let amountRawValue = ""; // string digit
+let amountIsCompact = false;
+let amountCompactText = "";
+const AMOUNT_MAX_DIGITS = 36; // muat sampai 9,9 Des (10^33)
+
+const measureAmountText = (() => {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  return (text) => {
+    const s = getComputedStyle(amountInput);
+    ctx.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+    return ctx.measureText(text).width;
   };
+})();
 
-  // --- SweetAlert2 Toast Helper ---
-  const showToast = (icon, title) => {
-    const Toast = Swal.mixin({
-      toast: true,
-      position: "top-end",
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
-      customClass: {
-        popup: "rounded-4 shadow-lg border-0",
-      },
-    });
+const getAmountAvailableWidth = () => {
+  const s = getComputedStyle(amountInput);
+  const pad = (parseFloat(s.paddingLeft) || 0) + (parseFloat(s.paddingRight) || 0);
+  return amountInput.clientWidth - pad;
+};
 
-    Toast.fire({
-      icon: icon, // 'success', 'error', 'warning', 'info'
-      title: title,
-    });
-  };
+/** Format penuh (dengan titik ribuan) dari string digit. */
+const formatAmountFull = (raw) => {
+  const digits = toDigits(raw);
+  return digits ? groupDigits(digits) : "";
+};
 
-  window.showToast = showToast;
+const renderAmountInput = () => {
+  if (!amountRawValue) {
+    amountInput.value = "";
+    amountIsCompact = false;
+    amountCompactText = "";
+    amountInput.removeAttribute("title");
+    return;
+  }
 
-  // --- RENDER FUNCTIONS (Bootstrap 5.3 Based) ---
-  const renderTransactionItem = (transaction) => {
-    const { id, type, description, amount, timestamp } = transaction;
-    const item = document.createElement("div");
-    item.classList.add("transaction-item-wrapper", "w-100", "mb-2");
-    item.dataset.id = id;
+  const full = formatAmountFull(amountRawValue);
+  const avail = getAmountAvailableWidth();
+  const fits = avail > 0 ? measureAmountText(full) <= avail - 4 : full.length <= 11;
 
-    const isIncome = type === "income";
-    const amountSign = isIncome ? "+" : "-";
-    const amountColor = isIncome ? "text-success" : "text-danger";
-    const borderAccent = isIncome ? "border-start border-4 border-success" : "border-start border-4 border-danger";
-    const iconBg = isIncome ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger";
-    const directionIcon = isIncome ? "bi-arrow-down-left" : "bi-arrow-up-right";
-    const badgeLabel = isIncome ? "Masuk" : "Keluar";
-    const badgeColor = isIncome ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger";
+  if (fits) {
+    amountInput.value = full;
+    amountIsCompact = false;
+    amountCompactText = "";
+    amountInput.title = full;
+  } else {
+    const compact = `≈ ${formatShortNumber(amountRawValue)}`;
+    amountInput.value = compact;
+    amountIsCompact = true;
+    amountCompactText = compact;
+    amountInput.title = full;
+  }
+};
 
-    item.innerHTML = `
+const setAmountValue = (value) => {
+  amountRawValue = toDigits(value).slice(0, AMOUNT_MAX_DIGITS);
+  renderAmountInput();
+};
+
+const resetAmountInput = () => {
+  amountRawValue = "";
+  amountIsCompact = false;
+  amountCompactText = "";
+  amountInput.value = "";
+  amountInput.removeAttribute("title");
+};
+
+amountInput.addEventListener("input", () => {
+  const v = amountInput.value;
+
+  if (v === "") {
+    amountRawValue = "";
+  } else if (amountIsCompact) {
+    if (v.startsWith(amountCompactText)) {
+      const extra = v.slice(amountCompactText.length).replace(/\D/g, "");
+      if (extra) amountRawValue = (amountRawValue + extra).slice(0, AMOUNT_MAX_DIGITS);
+    } else if (amountCompactText.startsWith(v)) {
+      amountRawValue = amountRawValue.slice(0, -1);
+    } else {
+      amountRawValue = v.replace(/\D/g, "").slice(0, AMOUNT_MAX_DIGITS);
+    }
+  } else {
+    amountRawValue = v.replace(/\D/g, "").slice(0, AMOUNT_MAX_DIGITS);
+  }
+
+  renderAmountInput();
+});
+
+let amountResizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(amountResizeTimer);
+  amountResizeTimer = setTimeout(() => {
+    renderAmountInput();
+    renderTransactions();
+  }, 150);
+});
+
+if (typeof mobileMedia.addEventListener === "function") {
+  mobileMedia.addEventListener("change", () => renderTransactions());
+} else if (typeof mobileMedia.addListener === "function") {
+  mobileMedia.addListener(() => renderTransactions());
+}
+
+// --- Tombol Bulatkan (BigInt agar aman untuk angka raksasa) ---
+const roundToNearestBig = (digits, kelipatan = 1000n, mode = "nearest") => {
+  const n = digitsToBigInt(digits);
+  if (n <= 0n) return 0n;
+  const k = BigInt(kelipatan);
+
+  switch (mode) {
+    case "up":
+      return ((n + k - 1n) / k) * k;
+    case "down":
+      return (n / k) * k;
+    default: {
+      const q = n / k;
+      const r = n % k;
+      return (r * 2n >= k ? q + 1n : q) * k;
+    }
+  }
+};
+
+if (roundButton) {
+  roundButton.addEventListener("click", () => {
+    const raw = digitsToBigInt(amountRawValue);
+
+    if (raw <= 0n) {
+      showToast("warning", "Isi nominal dulu sebelum dibulatkan!");
+      return;
+    }
+
+    const rounded = roundToNearestBig(amountRawValue, 1000n, "nearest");
+
+    if (rounded === raw) {
+      showToast("info", "Nominal sudah bulat: " + formatAmountFull(amountRawValue));
+      return;
+    }
+
+    amountRawValue = rounded.toString().slice(0, AMOUNT_MAX_DIGITS);
+    renderAmountInput();
+
+    showToast("success", `Dibulatkan: ${formatShortNumber(raw.toString())} → ${formatShortNumber(rounded.toString())}`);
+  });
+}
+
+// ========================================================
+//  RENDER DAFTAR TRANSAKSI
+// ========================================================
+const renderTransactionItem = (transaction) => {
+  const { id, type, description, amount, timestamp } = transaction;
+  const item = document.createElement("div");
+  item.classList.add("transaction-item-wrapper", "w-100", "mb-2");
+  item.dataset.id = id;
+
+  const isIncome = type === "income";
+  const amountSign = isIncome ? "+" : "-";
+  const amountColor = isIncome ? "text-success" : "text-danger";
+  const borderAccent = isIncome ? "border-start border-4 border-success" : "border-start border-4 border-danger";
+  const iconBg = isIncome ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger";
+  const directionIcon = isIncome ? "bi-arrow-down-left" : "bi-arrow-up-right";
+  const badgeLabel = isIncome ? "Masuk" : "Keluar";
+  const badgeColor = isIncome ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger";
+
+  const small = isSmallScreen();
+  const amountText = small ? formatCompactCurrency(amount) : formatCurrency(amount);
+  const amountTitle = formatCurrency(amount);
+
+  const dateText = formatDateTime(timestamp, small);
+  const dateTitle = formatDateTime(timestamp, false);
+
+  const safeDesc = escapeHTML(description || "(Tanpa Keterangan)");
+
+  item.innerHTML = `
       <div class="card transaction-card rounded-4 p-3 ${borderAccent} shadow-sm position-relative">
-        <div class="d-flex align-items-center justify-content-between">
-          <!-- Kiri: Icon & Info -->
-          <div class="d-flex align-items-center gap-3 overflow-hidden">
+        <div class="d-flex align-items-start justify-content-between gap-2">
+          <div class="d-flex align-items-start gap-2 flex-grow-1" style="min-width: 0;">
             <div class="icon-badge rounded-circle d-flex align-items-center justify-content-center ${iconBg}">
               <i class="bi ${directionIcon}"></i>
             </div>
-            <div class="text-truncate">
-              <div class="d-flex align-items-center gap-2 mb-1">
+            <div class="flex-grow-1" style="min-width: 0;">
+              <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
                 <span class="badge ${badgeColor} rounded-pill px-2 py-0" style="font-size: 0.65rem;">
                   ${badgeLabel}
                 </span>
-                <span class="text-muted small d-inline-flex align-items-center gap-1" style="font-size: 0.7rem;">
+                <span class="text-muted small d-inline-flex align-items-center gap-1" style="font-size: 0.7rem;" title="${dateTitle}">
                   <i class="far fa-clock"></i>
-                  ${formatDateTime(timestamp)}
+                  ${dateText}
                 </span>
               </div>
-              <h6 class="fw-bold mb-0 text-dark text-truncate" title="${description || "(Tanpa Keterangan)"}">
-                ${description || "(Tanpa Keterangan)"}
+              <h6 class="fw-bold mb-0 text-dark" style="word-break: break-word; overflow-wrap: anywhere;" title="${safeDesc}">
+                ${safeDesc}
               </h6>
             </div>
           </div>
 
-          <!-- Kanan: Nominal & Tombol Aksi -->
-          <div class="text-end ps-2 flex-shrink-0">
-            <div class="fw-bolder fs-6 ${amountColor}">
-              ${amountSign} ${formatCurrency(amount)}
+          <div class="text-end flex-shrink-0">
+            <div class="fw-bolder fs-6 ${amountColor}" style="white-space: nowrap;" title="${amountTitle}">
+              ${amountSign} ${amountText}
             </div>
             <div class="transaction-actions mt-1 d-flex gap-1 justify-content-end">
               <button type="button" class="btn btn-sm btn-light border text-primary edit-btn rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;" title="Edit Transaksi">
@@ -133,289 +375,230 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
     `;
 
-    return item;
-  };
+  return item;
+};
 
-  const renderTransactions = () => {
-    transactionList.innerHTML = ""; // Bersihkan list
+const renderTransactions = () => {
+  transactionList.innerHTML = "";
 
-    // Sorting berdasarkan waktu terbaru
-    let filtered = [...transactions].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  let filtered = [...transactions].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    // Filter berdasarkan Kategori (Semua, Income, Expense)
-    if (currentFilter !== "all") {
-      filtered = filtered.filter((tx) => tx.type === currentFilter);
-    }
+  if (currentFilter !== "all") filtered = filtered.filter((tx) => tx.type === currentFilter);
 
-    // Filter berdasarkan Search Query
-    if (currentSearchQuery.trim() !== "") {
-      const q = currentSearchQuery.toLowerCase();
-      filtered = filtered.filter((tx) => (tx.description || "").toLowerCase().includes(q));
-    }
+  if (currentSearchQuery.trim() !== "") {
+    const q = currentSearchQuery.toLowerCase();
+    filtered = filtered.filter((tx) => (tx.description || "").toLowerCase().includes(q));
+  }
 
-    // Kondisi List Kosong
-    if (transactions.length === 0) {
-      transactionList.innerHTML = `
+  if (transactions.length === 0) {
+    transactionList.innerHTML = `
         <div class="text-center py-5 text-muted opacity-75">
-          <div class="mb-3">
-            <i class="fas fa-receipt fa-3x text-secondary opacity-50"></i>
-          </div>
+          <div class="mb-3"><i class="fas fa-receipt fa-3x text-secondary opacity-50"></i></div>
           <h6 class="fw-bold text-secondary mb-1">Belum Ada Transaksi</h6>
           <p class="small text-muted mb-0">Silakan isi data</p>
-        </div>
-      `;
-    } else if (filtered.length === 0) {
-      transactionList.innerHTML = `
+        </div>`;
+  } else if (filtered.length === 0) {
+    transactionList.innerHTML = `
         <div class="text-center py-5 text-muted opacity-75">
           <i class="fas fa-magnifying-glass fa-2x text-secondary opacity-50 mb-2"></i>
           <h6 class="fw-semibold text-secondary mb-1">Data Tidak Ditemukan</h6>
           <p class="small text-muted mb-0">Coba cek kata kunci pencarian atau ganti filter antum.</p>
-        </div>
-      `;
-    } else {
-      filtered.forEach((transaction) => {
-        transactionList.appendChild(renderTransactionItem(transaction));
-      });
-    }
+        </div>`;
+  } else {
+    filtered.forEach((tx) => transactionList.appendChild(renderTransactionItem(tx)));
+  }
 
-    updateSummary();
-    saveToLocalStorage();
-  };
+  updateSummary();
+  saveToLocalStorage();
+};
 
-  // --- UPDATE SUMMARY (Saldo, In, Out) ---
-  const updateSummary = () => {
-    const income = transactions.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0);
+// ========================================================
+//  SUMMARY pakai BigInt supaya akurat sampai Des
+// ========================================================
+const sumByTypeBig = (type) => transactions.filter((tx) => tx.type === type).reduce((s, tx) => s + digitsToBigInt(tx.amount), 0n);
 
-    const expense = transactions.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0);
+const updateSummary = () => {
+  const income = sumByTypeBig("income");
+  const expense = sumByTypeBig("expense");
+  const balance = income - expense;
 
-    const balance = income - expense;
+  totalIncomeEl.textContent = formatCompactCurrency(income);
+  totalIncomeEl.title = formatCurrency(income);
+  totalExpenseEl.textContent = formatCompactCurrency(expense);
+  totalExpenseEl.title = formatCurrency(expense);
+  balanceEl.textContent = formatCurrency(balance);
 
-    totalIncomeEl.textContent = formatCurrency(income);
-    totalExpenseEl.textContent = formatCurrency(expense);
-    balanceEl.textContent = formatCurrency(balance);
+  balanceEl.classList.remove("text-danger", "text-success", "text-secondary");
+  if (balance < 0n) balanceEl.classList.add("text-danger");
+  else if (balance > 0n) balanceEl.classList.add("text-success");
+  else balanceEl.classList.add("text-secondary");
+};
 
-    // Styling dinamis saldo: merah jika defisit, hijau jika surplus
-    balanceEl.classList.remove("text-danger", "text-success", "text-secondary");
-    if (balance < 0) {
-      balanceEl.classList.add("text-danger");
-    } else if (balance > 0) {
-      balanceEl.classList.add("text-success");
-    } else {
-      balanceEl.classList.add("text-secondary");
-    }
-  };
+const saveToLocalStorage = () => {
+  localStorage.setItem("transactions_wa", JSON.stringify(transactions));
+};
 
-  // --- LOCAL STORAGE ---
-  const saveToLocalStorage = () => {
-    localStorage.setItem("transactions_wa", JSON.stringify(transactions));
-  };
+// ========================================================
+//  SUBMIT
+// ========================================================
+const handleFormSubmit = (e) => {
+  e.preventDefault();
 
-  // --- FORM SUBMIT HANDLER ---
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
+  const description = descriptionInput.value.trim();
+  const amountStr = amountRawValue;
+  const typeChecked = document.querySelector('input[name="type"]:checked');
 
-    const description = descriptionInput.value.trim();
-    const amountStr = amountInput.value.replace(/\./g, ""); // Hapus titik separator ribuan
-    const typeChecked = document.querySelector('input[name="type"]:checked');
+  if (!description) return showToast("error", "Keterangan transaksi wajib diisi ya!");
+  if (!amountStr || digitsToBigInt(amountStr) <= 0n) return showToast("error", "Nominal harus berupa angka lebih dari 0!");
+  if (!typeChecked) return showToast("error", "Pilih tipe transaksi dulu (In / Out).");
 
-    // Validasi Manual
-    if (!description) {
-      showToast("error", "Keterangan transaksi wajib diisi ya!");
-      // descriptionInput.focus();
-      return;
-    }
+  const type = typeChecked.value;
 
-    if (amountStr === "" || isNaN(parseFloat(amountStr)) || parseFloat(amountStr) <= 0) {
-      showToast("error", "Nominal harus berupa angka lebih dari 0!");
-      // amountInput.focus();
-      return;
-    }
-
-    if (!typeChecked) {
-      showToast("error", "Pilih tipe transaksi dulu (In / Out).");
-      return;
-    }
-
-    const amount = parseFloat(amountStr);
-    const type = typeChecked.value;
-
-    // Validasi Saldo saat Pengeluaran
-    if (type === "expense") {
-      const currentIncome = transactions.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0);
-      const currentExpense = transactions.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0);
-      let availableBalance = currentIncome - currentExpense;
-
-      // Jika edit mode, sesuaikan saldo dengan data lama
-      if (editingId !== null) {
-        const oldTx = transactions.find((tx) => tx.id === editingId);
-        if (oldTx && oldTx.type === "expense") {
-          availableBalance += oldTx.amount;
-        } else if (oldTx && oldTx.type === "income") {
-          availableBalance -= oldTx.amount;
-        }
-      }
-
-      if (amount > availableBalance) {
-        showToast("error", "Maaf, saldo antum tidak mencukupi!");
-        return;
-      }
-    }
+  if (type === "expense") {
+    let availableBalance = sumByTypeBig("income") - sumByTypeBig("expense");
 
     if (editingId !== null) {
-      // Mode Edit (Update data yang ada)
-      const index = transactions.findIndex((tx) => tx.id === editingId);
-      if (index > -1) {
-        transactions[index] = {
-          ...transactions[index],
-          description,
-          amount,
-          type,
-        };
-        showToast("success", "Alhamdulillah, transaksi berhasil diperbarui!");
-      } else {
-        showToast("error", "Gagal memperbarui: Data tidak ditemukan.");
-      }
-      stopEditMode();
+      const oldTx = transactions.find((tx) => tx.id === editingId);
+      if (oldTx && oldTx.type === "expense") availableBalance += digitsToBigInt(oldTx.amount);
+      else if (oldTx && oldTx.type === "income") availableBalance -= digitsToBigInt(oldTx.amount);
+    }
+
+    if (digitsToBigInt(amountStr) > availableBalance) return showToast("error", "Maaf, saldo antum tidak mencukupi!");
+  }
+
+  if (editingId !== null) {
+    const index = transactions.findIndex((tx) => tx.id === editingId);
+    if (index > -1) {
+      transactions[index] = { ...transactions[index], description, amount: amountStr, type };
+      showToast("success", "Alhamdulillah, transaksi berhasil diperbarui!");
     } else {
-      // Mode Tambah Baru
-      const newTransaction = {
-        id: Date.now(),
-        description,
-        amount,
-        type,
-        timestamp: new Date().toISOString(),
-      };
-      transactions.push(newTransaction);
-      showToast("success", "Alhamdulillah, transaksi berhasil dicatat!");
+      showToast("error", "Gagal memperbarui: Data tidak ditemukan.");
     }
+    stopEditMode();
+  } else {
+    transactions.push({ id: Date.now(), description, amount: amountStr, type, timestamp: new Date().toISOString() });
+    showToast("success", "Alhamdulillah, transaksi berhasil dicatat!");
+  }
 
-    renderTransactions();
-    transactionForm.reset();
-    // descriptionInput.focus();
-    // Default radio balik ke pemasukan
-    const incomeRadio = document.querySelector('input[name="type"][value="income"]');
-    if (incomeRadio) incomeRadio.checked = true;
-  };
+  renderTransactions();
+  resetAmountInput();
+  transactionForm.reset();
+};
 
-  // --- EDIT MODE HANDLERS ---
-  const startEditMode = (id) => {
-    const transaction = transactions.find((tx) => tx.id === id);
-    if (!transaction) return;
+// ========================================================
+//  EDIT / DELETE / RESET
+// ========================================================
+const startEditMode = (id) => {
+  const tx = transactions.find((t) => t.id === id);
+  if (!tx) return;
 
-    editingId = id;
-    editIdInput.value = id;
-    descriptionInput.value = transaction.description;
-    amountInput.value = new Intl.NumberFormat("id-ID").format(transaction.amount);
+  editingId = id;
+  editIdInput.value = id;
+  descriptionInput.value = tx.description;
+  setAmountValue(tx.amount);
 
-    const radio = document.querySelector(`input[name="type"][value="${transaction.type}"]`);
-    if (radio) radio.checked = true;
+  const radio = document.querySelector(`input[name="type"][value="${tx.type}"]`);
+  if (radio) radio.checked = true;
 
-    // Ganti Tampilan Tombol Simpan
-    addButton.innerHTML = '<i class="fas fa-floppy-disk me-1"></i> <span>Simpan Perubahan</span>';
-    addButton.className = "btn btn-primary text-white fw-bold py-2 px-4 rounded-pill flex-grow-1 d-flex align-items-center justify-content-center gap-2 shadow-sm";
-    addButton.title = "Simpan Perubahan";
+  addButton.innerHTML = '<i class="fas fa-floppy-disk me-1"></i> <span>Simpan Perubahan</span>';
+  addButton.className = "btn btn-primary text-white fw-bold py-2 px-4 rounded-pill flex-grow-1 d-flex align-items-center justify-content-center gap-2 shadow-sm";
+  addButton.title = "Simpan Perubahan";
 
-    // Munculkan Tombol Batal Edit
-    cancelEditButton.classList.remove("d-none");
-    cancelEditButton.classList.add("d-inline-flex");
+  cancelEditButton.classList.remove("d-none");
+  cancelEditButton.classList.add("d-inline-flex");
 
-    descriptionInput.focus();
-    descriptionInput.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
+  descriptionInput.focus();
+  descriptionInput.scrollIntoView({ behavior: "smooth", block: "center" });
+};
 
-  const stopEditMode = () => {
-    editingId = null;
-    editIdInput.value = "";
-    transactionForm.reset();
+const stopEditMode = () => {
+  editingId = null;
+  editIdInput.value = "";
+  resetAmountInput();
+  transactionForm.reset();
 
-    const incomeRadio = document.querySelector('input[name="type"][value="income"]');
-    if (incomeRadio) incomeRadio.checked = true;
+  const incomeRadio = document.querySelector('input[name="type"][value="income"]');
+  if (incomeRadio) incomeRadio.checked = true;
 
-    // Kembalikan Tombol ke Default Tambah
-    addButton.innerHTML = '<i class="fas fa-circle-plus me-1"></i> <span>Catat Transaksi</span>';
-    addButton.className = "btn btn-gradient-emerald text-white fw-bold py-2 px-4 rounded-pill flex-grow-1 d-flex align-items-center justify-content-center gap-2 shadow-sm";
-    addButton.title = "Catat Transaksi";
+  addButton.innerHTML = '<i class="fas fa-circle-plus me-1"></i> <span>Catat Transaksi</span>';
+  addButton.className = "btn btn-gradient-emerald text-white fw-bold py-2 px-4 rounded-pill flex-grow-1 d-flex align-items-center justify-content-center gap-2 shadow-sm";
+  addButton.title = "Catat Transaksi";
 
-    // Sembunyikan Tombol Batal
-    cancelEditButton.classList.remove("d-inline-flex");
-    cancelEditButton.classList.add("d-none");
-  };
+  cancelEditButton.classList.remove("d-inline-flex");
+  cancelEditButton.classList.add("d-none");
+};
 
-  // --- DELETE & RESET HANDLERS ---
-  const handleDelete = (id) => {
-    Swal.fire({
-      title: "Hapus Catatan Ini?",
-      text: "Data transaksi ini bakal dihapus permanen ya akhi.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#dc3545",
-      cancelButtonColor: "#6c757d",
-      confirmButtonText: '<i class="fas fa-trash-can me-1"></i> Ya, Hapus!',
-      cancelButtonText: "Batal",
-      customClass: {
-        popup: "rounded-4 shadow-lg",
-        confirmButton: "btn btn-danger rounded-pill px-4",
-        cancelButton: "btn btn-secondary rounded-pill px-4",
-      },
-      buttonsStyling: false,
-    }).then((result) => {
-      if (result.isConfirmed) {
-        transactions = transactions.filter((tx) => tx.id !== id);
-        if (editingId === id) {
-          stopEditMode();
-        }
-        renderTransactions();
-        showToast("success", "Transaksi berhasil dihapus.");
-      }
-    });
-  };
-
-  const handleReset = () => {
-    if (transactions.length === 0) {
-      showToast("info", "Belum ada data untuk direset");
-      return;
+const handleDelete = (id) => {
+  Swal.fire({
+    title: "Hapus Catatan Ini?",
+    text: "Data transaksi ini bakal dihapus permanen ya akhi.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#dc3545",
+    cancelButtonColor: "#6c757d",
+    confirmButtonText: '<i class="fas fa-trash-can me-1"></i> Ya, Hapus!',
+    cancelButtonText: "Batal",
+    customClass: {
+      popup: "rounded-4 shadow-lg",
+      confirmButton: "btn btn-danger rounded-pill px-4",
+      cancelButton: "btn btn-secondary rounded-pill px-4",
+    },
+    buttonsStyling: false,
+  }).then((result) => {
+    if (result.isConfirmed) {
+      transactions = transactions.filter((tx) => tx.id !== id);
+      if (editingId === id) stopEditMode();
+      renderTransactions();
+      showToast("success", "Transaksi berhasil dihapus.");
     }
+  });
+};
 
-    Swal.fire({
-      title: "Reset Semua Catatan?",
-      text: "PERINGATAN: Semua riwayat transaksi akan dihapus dari penyimpanan perangkat!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#dc3545",
-      cancelButtonColor: "#6c757d",
-      confirmButtonText: '<i class="fas fa-trash-can me-1"></i> Ya, Bersihkan Semua!',
-      cancelButtonText: "Batal",
-      customClass: {
-        popup: "rounded-4 shadow-lg",
-        confirmButton: "btn btn-danger rounded-pill px-4",
-        cancelButton: "btn btn-secondary rounded-pill px-4",
-      },
-      buttonsStyling: false,
-    }).then((result) => {
-      if (result.isConfirmed) {
-        transactions = [];
-        stopEditMode();
-        renderTransactions();
-        showToast("success", "Semua data kas berhasil dibersihkan.");
-      }
-    });
-  };
+const handleReset = () => {
+  if (transactions.length === 0) return showToast("info", "Belum ada data untuk direset");
 
-  const buildReportData = () => {
-    const sorted = [...transactions].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  Swal.fire({
+    title: "Reset Semua Catatan?",
+    text: "PERINGATAN: Semua riwayat transaksi akan dihapus dari penyimpanan perangkat!",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#dc3545",
+    cancelButtonColor: "#6c757d",
+    confirmButtonText: '<i class="fas fa-trash-can me-1"></i> Ya, Bersihkan Semua!',
+    cancelButtonText: "Batal",
+    customClass: {
+      popup: "rounded-4 shadow-lg",
+      confirmButton: "btn btn-danger rounded-pill px-4",
+      cancelButton: "btn btn-secondary rounded-pill px-4",
+    },
+    buttonsStyling: false,
+  }).then((result) => {
+    if (result.isConfirmed) {
+      transactions = [];
+      stopEditMode();
+      renderTransactions();
+      showToast("success", "Semua data kas berhasil dibersihkan.");
+    }
+  });
+};
 
-    const totalIncome = transactions.filter((tx) => tx.type === "income").reduce((sum, tx) => sum + tx.amount, 0);
-    const totalExpense = transactions.filter((tx) => tx.type === "expense").reduce((sum, tx) => sum + tx.amount, 0);
-    const balance = totalIncome - totalExpense;
+// ========================================================
+//  LAPORAN
+// ========================================================
+const buildReportData = () => {
+  const sorted = [...transactions].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const totalIncome = sumByTypeBig("income");
+  const totalExpense = sumByTypeBig("expense");
+  const balance = totalIncome - totalExpense;
 
-    const rows = sorted
-      .map((tx, idx) => {
-        const isIncome = tx.type === "income";
-        return `
+  const rows = sorted
+    .map((tx, idx) => {
+      const isIncome = tx.type === "income";
+      return `
         <tr>
           <td style="text-align:center;">${idx + 1}</td>
           <td>${formatDateTime(tx.timestamp)}</td>
-          <td>${tx.description || "(Tanpa Keterangan)"}</td>
+          <td>${escapeHTML(tx.description || "(Tanpa Keterangan)")}</td>
           <td style="text-align:center; color:${isIncome ? "#198754" : "#dc3545"}; font-weight:600;">
             ${isIncome ? "Masuk" : "Keluar"}
           </td>
@@ -423,41 +606,24 @@ document.addEventListener("DOMContentLoaded", () => {
             ${isIncome ? "+" : "-"} ${formatCurrency(tx.amount)}
           </td>
         </tr>`;
-      })
-      .join("");
+    })
+    .join("");
 
-    return { rows, totalIncome, totalExpense, balance };
-  };
+  return { rows, totalIncome, totalExpense, balance };
+};
 
-  // --- SHARED: CSS laporan (dipakai preview & pdf) ---
-  const reportCSS = `
+const reportCSS = `
   * { box-sizing: border-box; }
-  body {
-    font-family: Arial, Helvetica, sans-serif;
-    margin: 20px;
-    color: #212529;
-    font-size: 12px;
-    background: #fff;
-  }
+  body { font-family: Arial, Helvetica, sans-serif; margin: 20px; color: #212529; font-size: 12px; background: #fff; }
   h1 { font-size: 18px; margin: 0 0 4px 0; }
   p.sub { font-size: 11px; color: #6c757d; margin: 0 0 16px 0; }
-  .summary {
-    display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
-  }
-  .summary div {
-    border: 1px solid #dee2e6; padding: 8px 12px;
-    border-radius: 6px; font-size: 12px;
-  }
+  .summary { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .summary div { border: 1px solid #dee2e6; padding: 8px 12px; border-radius: 6px; font-size: 12px; }
   .income { color: #198754; font-weight: 700; }
   .expense { color: #dc3545; font-weight: 700; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-  th, td {
-    border: 1px solid #dee2e6; padding: 7px 9px;
-    font-size: 12px; vertical-align: middle;
-  }
-  thead th {
-    background: #f1f3f5; text-align: left; font-weight: 700;
-  }
+  th, td { border: 1px solid #dee2e6; padding: 7px 9px; font-size: 12px; vertical-align: middle; }
+  thead th { background: #f1f3f5; text-align: left; font-weight: 700; }
   tfoot td { font-weight: 700; background: #f8f9fa; }
   @media print {
     body { margin: 10px; }
@@ -466,12 +632,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 `;
 
-  // --- SHARED: Bangun body HTML laporan (h1, summary, tabel) ---
-  const buildReportBodyHTML = () => {
-    const { rows, totalIncome, totalExpense, balance } = buildReportData();
-    const balanceColor = balance < 0 ? "#dc3545" : "#198754";
+const buildReportBodyHTML = () => {
+  const { rows, totalIncome, totalExpense, balance } = buildReportData();
+  const balanceColor = balance < 0n ? "#dc3545" : "#198754";
 
-    return `
+  return `
     <h1>Laporan Keuangan - Buku Kas</h1>
     <p class="sub">
       Catatan Kas Harian &middot;
@@ -503,18 +668,12 @@ document.addEventListener("DOMContentLoaded", () => {
       </tfoot>
     </table>
   `;
-  };
+};
 
-  // --- HANDLER 1: Preview Laporan ---
-  const handlePreview = () => {
-    if (transactions.length === 0) {
-      showToast("error", "Belum ada data transaksi untuk di-preview!");
-      return;
-    }
+const handlePreview = () => {
+  if (transactions.length === 0) return showToast("error", "Belum ada data transaksi untuk di-preview!");
 
-    const body = buildReportBodyHTML();
-
-    const content = `
+  const content = `
     <!doctype html>
     <html lang="id">
     <head>
@@ -522,7 +681,6 @@ document.addEventListener("DOMContentLoaded", () => {
       <title>Preview Laporan</title>
       <style>
         ${reportCSS}
-        /* Tombol print melayang khusus di jendela preview */
         .floating-print {
           position: fixed; top: 16px; right: 16px;
           background: #198754; color: #fff; border: none;
@@ -535,32 +693,25 @@ document.addEventListener("DOMContentLoaded", () => {
       </style>
     </head>
     <body>
-      <button class="floating-print no-print" onclick="window.print()">
-        Cetak PDF
-      </button>
-      ${body}
+      <button class="floating-print no-print" onclick="window.print()">Cetak PDF</button>
+      ${buildReportBodyHTML()}
     </body>
     </html>
   `;
 
-    const win = window.open("", "_blank", "width=700,height=600");
-    if (!win) {
-      showToast("error", "Gagal membuka preview. Izinkan popup di browser.");
-      return;
-    }
-    win.document.write(content);
-    win.document.close();
-    win.focus();
+  const win = window.open("", "_blank", "width=700,height=600");
+  if (!win) return showToast("error", "Gagal membuka preview. Izinkan popup di browser.");
+  win.document.write(content);
+  win.document.close();
+  win.focus();
+};
 
-    // ❗ TIDAK auto-print — biar user preview dulu, klik tombol "Cetak / Simpan PDF" di jendela itu
-  };
+previewPrintButton.addEventListener("click", handlePreview);
 
-  previewPrintButton.addEventListener("click", handlePreview);
-
-  const handleInfo = () => {
-    Swal.fire({
-      title: '<i class="fas fa-circle-info text-success me-2"></i>Cara Pakai',
-      html: `
+const handleInfo = () => {
+  Swal.fire({
+    title: '<i class="fas fa-circle-info text-success me-2"></i>Cara Pakai',
+    html: `
       <div class="text-start small" style="line-height: 1.7;">
         <p class="mb-2 fw-bold text-success">📝 Mencatat Transaksi</p>
         <ol class="ps-3 mb-3">
@@ -594,70 +745,54 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       </div>
     `,
-      icon: "info",
-      confirmButtonText: '<i class="fas fa-check me-1"></i> Mengerti',
-      customClass: {
-        popup: "rounded-4 shadow-lg",
-        confirmButton: "btn btn-gradient-emerald rounded-pill px-4",
-      },
-      buttonsStyling: false,
-      width: "500px",
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-    });
-  };
-
-  infoButton.addEventListener("click", handleInfo);
-
-  // --- EVENT LISTENERS ---
-  transactionForm.addEventListener("submit", handleFormSubmit);
-
-  transactionList.addEventListener("click", (e) => {
-    const editButton = e.target.closest(".edit-btn");
-    const deleteButton = e.target.closest(".delete-btn");
-    const itemWrapper = e.target.closest(".transaction-item-wrapper");
-
-    if (!itemWrapper) return;
-    const id = parseInt(itemWrapper.dataset.id);
-
-    if (editButton) {
-      startEditMode(id);
-    } else if (deleteButton) {
-      handleDelete(id);
-    }
+    icon: "info",
+    confirmButtonText: '<i class="fas fa-check me-1"></i> Mengerti',
+    customClass: { popup: "rounded-4 shadow-lg", confirmButton: "btn btn-gradient-emerald rounded-pill px-4" },
+    buttonsStyling: false,
+    width: "500px",
+    allowOutsideClick: false,
+    allowEscapeKey: false,
   });
+};
 
-  resetButton.addEventListener("click", handleReset);
-  cancelEditButton.addEventListener("click", stopEditMode);
+infoButton.addEventListener("click", handleInfo);
 
-  // Auto Thousands Separator on Amount Input
-  amountInput.addEventListener("input", (e) => {
-    let rawValue = e.target.value.replace(/\D/g, "");
-    if (rawValue) {
-      e.target.value = new Intl.NumberFormat("id-ID").format(rawValue);
-    } else {
-      e.target.value = "";
-    }
-  });
+// ========================================================
+//  EVENTS
+// ========================================================
+transactionForm.addEventListener("submit", handleFormSubmit);
 
-  // Filter Buttons
-  filterButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      filterButtons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentFilter = btn.dataset.filter;
-      renderTransactions();
-    });
-  });
-
-  // Real-time Search Input
-  if (searchInput) {
-    searchInput.addEventListener("input", (e) => {
-      currentSearchQuery = e.target.value;
-      renderTransactions();
-    });
-  }
-
-  // --- INITIALIZATION ---
-  renderTransactions();
+transactionList.addEventListener("click", (e) => {
+  const editButton = e.target.closest(".edit-btn");
+  const deleteButton = e.target.closest(".delete-btn");
+  const itemWrapper = e.target.closest(".transaction-item-wrapper");
+  if (!itemWrapper) return;
+  const id = parseInt(itemWrapper.dataset.id);
+  if (editButton) startEditMode(id);
+  else if (deleteButton) handleDelete(id);
 });
+
+resetButton.addEventListener("click", handleReset);
+cancelEditButton.addEventListener("click", stopEditMode);
+
+filterButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    filterButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFilter = btn.dataset.filter;
+    renderTransactions();
+  });
+});
+
+if (searchInput) {
+  searchInput.addEventListener("input", (e) => {
+    currentSearchQuery = e.target.value;
+    renderTransactions();
+  });
+}
+
+// ========================================================
+//  INIT
+// ========================================================
+renderTransactions();
+renderAmountInput();
