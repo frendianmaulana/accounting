@@ -1,6 +1,6 @@
 const cache_name = "cache-iyan-v1";
 const file_penting = [
-  "/",
+  "./",
   "./index.html",
   "./menu.js",
   "./script.js",

@@ -139,9 +139,42 @@ const showToast = (icon, title) => {
     toast: true,
     position: "top-end",
     showConfirmButton: false,
-    timer: 1200,
-    timerProgressBar: true,
+    // timer: 1200,
+    // timerProgressBar: true,
     customClass: { popup: "rounded-4 shadow-lg border-0" },
+    didOpen: (toast) => {
+      let startX = 0;
+      let currentX = 0;
+
+      toast.addEventListener(
+        "touchstart",
+        (e) => {
+          startX = e.touches[0].clientX;
+          toast.style.transition = "none";
+        },
+        { passive: true },
+      );
+
+      toast.addEventListener(
+        "touchmove",
+        (e) => {
+          currentX = e.touches[0].clientX - startX;
+          toast.style.transform = `translateX(${currentX}px)`;
+          toast.style.opacity = String(1 - Math.min(Math.abs(currentX) / 150, 1));
+        },
+        { passive: true },
+      );
+
+      toast.addEventListener("touchend", () => {
+        toast.style.transition = "transform .2s, opacity .2s";
+        if (Math.abs(currentX) > 80) {
+          Swal.close();
+        } else {
+          toast.style.transform = "";
+          toast.style.opacity = "";
+        }
+      });
+    },
   });
   Toast.fire({ icon, title });
 };
@@ -612,95 +645,206 @@ const buildReportData = () => {
   return { rows, totalIncome, totalExpense, balance };
 };
 
+const buildReportFileName = () => {
+  const tanggal = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `Laporan-Keuangan_${tanggal.getFullYear()}-${pad(tanggal.getMonth() + 1)}-${pad(tanggal.getDate())}_${pad(tanggal.getHours())}_${pad(tanggal.getMinutes())}`;
+};
+
 const reportCSS = `
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; margin: 20px; color: #212529; font-size: 12px; background: #fff; }
-  h1 { font-size: 18px; margin: 0 0 4px 0; }
-  p.sub { font-size: 11px; color: #6c757d; margin: 0 0 16px 0; }
-  .summary { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .summary div { border: 1px solid #dee2e6; padding: 8px 12px; border-radius: 6px; font-size: 12px; }
-  .income { color: #198754; font-weight: 700; }
-  .expense { color: #dc3545; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-  th, td { border: 1px solid #dee2e6; padding: 7px 9px; font-size: 12px; vertical-align: middle; }
-  thead th { background: #f1f3f5; text-align: left; font-weight: 700; }
-  tfoot td { font-weight: 700; background: #f8f9fa; }
+  html, body { background: #f8f9fa; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color: #212529; font-size: 13px; }
+
+  .report-shell { max-width: 1000px; margin: 0 auto; }
+
+  /* Fallback tabel saat Bootstrap gagal dimuat (offline) */
+  .report-table { width: 100%; border-collapse: collapse; }
+  .report-table th, .report-table td { border: 1px solid #dee2e6; padding: 6px 8px; }
+  .report-table thead th { background: #f1f3f5; white-space: nowrap; font-weight: 700; }
+  .report-table tfoot td { background: #f8f9fa; font-weight: 700; }
+  .report-table td, .report-table th { vertical-align: middle; }
+  .report-table .desc-cell { word-break: break-word; overflow-wrap: anywhere; min-width: 180px; }
+
+  .floating-print {
+    position: fixed; top: 18px; right: 18px; z-index: 1050;
+    background: #198754; color: #fff; border: none;
+    padding: 10px 18px; border-radius: 50px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(25,135,84,.35);
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .floating-print:hover { background: #157347; transform: translateY(-2px); }
+
   @media print {
-    body { margin: 10px; }
+    html, body { background: #fff !important; margin: 0; padding: 0; font-size: 12px; }
     @page { size: A4; margin: 12mm; }
     .no-print { display: none !important; }
+    .report-shell { max-width: 100%; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .report-table thead th,
+    .report-table tfoot td,
+    .text-success, .text-danger,
+    [class*="bg-success-subtle"], [class*="bg-danger-subtle"], [class*="bg-primary-subtle"] {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
   }
 `;
 
 const buildReportBodyHTML = () => {
   const { rows, totalIncome, totalExpense, balance } = buildReportData();
+  const balanceClass = balance < 0n ? "text-danger" : balance > 0n ? "text-success" : "text-secondary";
   const balanceColor = balance < 0n ? "#dc3545" : "#198754";
 
   return `
-    <h1>Laporan Keuangan - Buku Kas</h1>
-    <p class="sub">
-      Catatan Kas Harian &middot;
-      Dicetak: ${formatDateTime(new Date().toISOString())}
-    </p>
+    <div class="report-shell container-fluid py-4 px-3 px-md-4">
 
-    <div class="summary">
-      <div>Total Pemasukan: <span class="income">${formatCurrency(totalIncome)}</span></div>
-      <div>Total Pengeluaran: <span class="expense">${formatCurrency(totalExpense)}</span></div>
-      <div>Saldo Bersih: <span style="color:${balanceColor}; font-weight:700;">${formatCurrency(balance)}</span></div>
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+        <div>
+          <h1 class="h4 fw-bold mb-1">
+            <i class="bi bi-wallet2 text-success me-2"></i>Laporan Keuangan
+          </h1>
+          <p class="text-muted small mb-0">
+            Catatan Kas Harian &middot; Dicetak: ${formatDateTime(new Date().toISOString())}
+          </p>
+        </div>
+        <span class="badge bg-success-subtle text-success-emphasis rounded-pill px-3 py-2 align-self-start align-self-md-center">
+          <i class="bi bi-receipt me-1"></i>${transactions.length} Transaksi
+        </span>
+      </div>
+
+      <div class="row g-2 g-md-3 mb-3">
+        <div class="col-4">
+          <div class="card border-0 rounded-4 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3 py-3">
+              <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                <i class="bi bi-arrow-down-left"></i>
+              </div>
+              <div>
+                <div class="text-muted small">Total Pemasukan</div>
+                <div class="fw-bold text-success">${formatCurrency(totalIncome)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="card border-0 rounded-4 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3 py-3">
+              <div class="rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                <i class="bi bi-arrow-up-right"></i>
+              </div>
+              <div>
+                <div class="text-muted small">Total Pengeluaran</div>
+                <div class="fw-bold text-danger">${formatCurrency(totalExpense)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-4">
+          <div class="card border-0 rounded-4 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3 py-3">
+              <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                <i class="bi bi-cash-stack"></i>
+              </div>
+              <div>
+                <div class="text-muted small">Saldo Bersih</div>
+                <div class="fw-bold ${balanceClass}">${formatCurrency(balance)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 rounded-4 shadow-sm overflow-hidden">
+        <div class="table-responsive">
+          <table class="table report-table table-bordered table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:44px; text-align:center;">No</th>
+                <th style="width:160px;">Tanggal</th>
+                <th>Keterangan</th>
+                <th style="width:90px; text-align:center;">Tipe</th>
+                <th style="width:150px; text-align:right;">Nominal</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="text-end">Saldo Bersih</td>
+                <td class="text-end" style="color:${balanceColor};">${formatCurrency(balance)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th style="width:40px; text-align:center;">No</th>
-          <th style="width:150px;">Tanggal</th>
-          <th>Keterangan</th>
-          <th style="width:80px; text-align:center;">Tipe</th>
-          <th style="width:130px; text-align:right;">Nominal</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-      <tfoot>
-        <tr>
-          <td colspan="4" style="text-align:right;">Saldo Bersih</td>
-          <td style="text-align:right; color:${balanceColor};">${formatCurrency(balance)}</td>
-        </tr>
-      </tfoot>
-    </table>
   `;
 };
 
 const handlePreview = () => {
   if (transactions.length === 0) return showToast("error", "Belum ada data transaksi untuk di-preview!");
 
+  const filename = buildReportFileName();
+  const filenameJSON = JSON.stringify(filename);
+
   const content = `
     <!doctype html>
     <html lang="id">
     <head>
       <meta charset="UTF-8" />
-      <title>Preview Laporan</title>
-      <style>
-        ${reportCSS}
-        .floating-print {
-          position: fixed; top: 16px; right: 16px;
-          background: #198754; color: #fff; border: none;
-          padding: 10px 16px; border-radius: 50px;
-          font-size: 13px; font-weight: 700; cursor: pointer;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          display: inline-flex; align-items: center; gap: 8px;
-        }
-        .floating-print:hover { background: #157347; }
-      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>${filename}</title>
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/css/bootstrap.min.css"
+        crossorigin="anonymous"
+      />
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
+      <style>${reportCSS}</style>
     </head>
     <body>
-      <button class="floating-print no-print" onclick="window.print()">Cetak PDF</button>
+      <button class="floating-print no-print" onclick="window.print()">
+        <i class="bi bi-printer-fill"></i> Cetak / Simpan PDF
+      </button>
       ${buildReportBodyHTML()}
+      <script>
+        (function(){
+          const file_name = ${filenameJSON};
+          let titlebeforeprint = document.title;
+
+          window.addEventListener("beforeprint", ()=>{
+            titlebeforeprint = document.title;
+            document.title = file_name;
+          });
+          window.addEventListener("afterprint", ()=>{
+            document.title = titlebeforeprint || file_name;
+          });
+          window.addEventListener("keydown",(e)=>{
+            if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==="p"){
+              document.title=file_name;
+            }
+          });
+
+          document.querySelector(".floating-print").addEventListener("click",()=>{
+            document.title = file_name;
+          })
+        })
+      </script>
     </body>
     </html>
   `;
 
-  const win = window.open("", "_blank", "width=700,height=600");
+  // Jangan paksa ukuran 700x600 lagi — gunakan ukuran layar agar tidak "memaksakan"
+  const w = Math.min(window.innerWidth - 40, 1100);
+  const h = Math.min(window.innerHeight - 80, 900);
+  const features = `width=${Math.max(w, 360)},height=${Math.max(h, 480)},left=20,top=20,scrollbars=yes,resizable=yes`;
+
+  const win = window.open("", "_blank", features);
   if (!win) return showToast("error", "Gagal membuka preview. Izinkan popup di browser.");
+  win.document.open();
   win.document.write(content);
   win.document.close();
   win.focus();
@@ -710,7 +854,7 @@ previewPrintButton.addEventListener("click", handlePreview);
 
 const handleInfo = () => {
   Swal.fire({
-    title: '<i class="fas fa-circle-info text-success me-2"></i>Cara Pakai',
+    title: '<i class="fas fa-circle-info text-success me-2"></i>Panduan Penggunaan',
     html: `
       <div class="text-start small" style="line-height: 1.7;">
         <p class="mb-2 fw-bold text-success">📝 Mencatat Transaksi</p>
@@ -721,35 +865,59 @@ const handleInfo = () => {
           <li>Klik tombol <b>Catat Transaksi</b>.</li>
         </ol>
 
-        <p class="mb-2 fw-bold text-success">✏️ Edit &amp; Hapus</p>
+        <p class="mb-2 fw-bold text-success">✏️ Mengubah &amp; Menghapus</p>
         <ul class="ps-3 mb-3">
           <li>Klik ikon <i class="fas fa-pen-to-square text-primary"></i> untuk mengubah transaksi.</li>
           <li>Klik ikon <i class="fas fa-trash-can text-danger"></i> untuk menghapus transaksi.</li>
         </ul>
 
-        <p class="mb-2 fw-bold text-success">🔍 Filter &amp; Cari</p>
+        <p class="mb-2 fw-bold text-success">🔍 Menyaring &amp; Mencari</p>
         <ul class="ps-3 mb-3">
           <li>Ketik pada kolom <b>pencarian</b> untuk mencari transaksi.</li>
           <li>Gunakan tombol <b>Semua / Masuk / Keluar</b> untuk menyaring data.</li>
         </ul>
 
-        <p class="mb-2 fw-bold text-success">🖨️ Cetak &amp; Reset</p>
-        <ul class="ps-3 mb-0">
-          <li>Klik <i class="bi bi-printer-fill"></i> untuk preview laporan dan cetak PDF.</li>
-          <li>Klik <i class="fas fa-rotate-right"></i> untuk menghapus semua data.</li>
+        <p class="mb-2 fw-bold text-success">🖨️ Mencetak &amp; Mengatur Ulang</p>
+        <ul class="ps-3 mb-3">
+          <li>Klik <i class="bi bi-printer-fill"></i> untuk melihat laporan dan mencetaknya.</li>
+          <li>Klik <i class="fas fa-rotate-right"></i> untuk menghapus seluruh data.</li>
         </ul>
+
+        <p class="mb-2 fw-bold text-success">📲 Memasang Aplikasi</p>
+        <ul class="ps-3 mb-2">
+          <li><b>Android:</b> buka menu <b>⋮</b> pada peramban, lalu pilih <b>Install app</b> atau <b>Tambahkan ke layar utama</b>.</li>
+          <li><b>iPhone:</b> tekan tombol <b>Bagikan</b>, lalu pilih <b>Tambahkan ke Layar Utama</b>.</li>
+          <li><b>Komputer:</b> klik ikon <b>Install</b> pada bilah alamat, atau buka menu <b>⋮</b> lalu pilih <b>Install Buku Keuangan</b>.</li>
+        </ul>
+        <p class="text-muted mb-3" style="font-size: 0.75rem;">
+          Setelah dipasang, aplikasi dapat dibuka langsung dari layar utama sebagaimana aplikasi pada umumnya.
+        </p>
+
+        <p class="mb-2 fw-bold text-success">📴 Penggunaan Tanpa Koneksi Internet</p>
+        <ul class="ps-3 mb-2">
+          <li>Buka aplikasi minimal <b>satu kali</b> saat terhubung internet agar seluruh tampilan tersimpan di perangkat.</li>
+          <li>Setelah itu, aplikasi dapat dibuka dan digunakan <b>tanpa koneksi internet</b>.</li>
+          <li>Seluruh catatan transaksi tersimpan otomatis di perangkat, sehingga tetap aman saat offline.</li>
+          <li>Pratinjau laporan dan pencetakan tetap dapat dilakukan sebagaimana biasa.</li>
+        </ul>
+        <p class="text-muted mb-3" style="font-size: 0.75rem;">
+          Apabila aplikasi belum pernah dibuka saat terhubung internet, penggunaan tanpa koneksi belum dapat dilakukan.
+        </p>
 
         <div class="alert alert-success py-2 px-3 mt-3 mb-0 small border-0" style="border-radius: 10px;">
           <i class="fas fa-shield-halved me-1"></i>
-          Data tersimpan otomatis di perangkat anda.
+          Seluruh data tersimpan otomatis dan aman di perangkat Anda.
         </div>
       </div>
     `,
     icon: "info",
     confirmButtonText: '<i class="fas fa-check me-1"></i> Mengerti',
-    customClass: { popup: "rounded-4 shadow-lg", confirmButton: "btn btn-gradient-emerald rounded-pill px-4" },
+    customClass: {
+      popup: "rounded-4 shadow-lg",
+      confirmButton: "btn btn-gradient-emerald rounded-pill px-4",
+    },
     buttonsStyling: false,
-    width: "500px",
+    width: "520px",
     allowOutsideClick: false,
     allowEscapeKey: false,
   });
